@@ -21,7 +21,7 @@ export const ProfileMenu: FC = () => {
     <>
       <ProfileMenuUI handleLogout={handleLogout} pathname={pathname} />
       {isLoading && <p>Выходим из аккаунта...</p>}
-      {error && <p>{error}</p>}
+      {pathname !== '/profile' && error && <p>{error}</p>}
     </>
   );
 };

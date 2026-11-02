@@ -11,7 +11,8 @@ import {
   loginUserApi,
   registerUserApi,
   logoutApi,
-  refreshToken
+  refreshToken,
+  updateUserApi
 } from '@api';
 
 import type { TLoginData, TRegisterData } from '@api';
@@ -121,6 +122,29 @@ export const logoutUser = createAsyncThunk<void, void, TAuthThunkConfig>(
   }
 );
 
+export const updateUser = createAsyncThunk<
+  TUser,
+  Partial<TRegisterData>,
+  TAuthThunkConfig
+>(
+  'auth/updateUser',
+  async (data) => {
+    const response = await updateUserApi(data);
+
+    if (!response.success || !response.user) {
+      throw new Error('Не удалось сохранить профиль');
+    }
+
+    return response.user;
+  },
+  {
+    condition: (_, { getState }) => {
+      const { user, isLoading } = getState().auth;
+      return Boolean(user) && !isLoading;
+    }
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -146,22 +170,25 @@ const authSlice = createSlice({
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
       })
+      .addCase(updateUser.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
       .addMatcher(
-        isPending(checkAuth, loginUser, registerUser, logoutUser),
+        isPending(checkAuth, loginUser, registerUser, logoutUser, updateUser),
         (state) => {
           state.isLoading = true;
           state.error = null;
         }
       )
       .addMatcher(
-        isFulfilled(checkAuth, loginUser, registerUser, logoutUser),
+        isFulfilled(checkAuth, loginUser, registerUser, logoutUser, updateUser),
         (state) => {
           state.isLoading = false;
           state.isAuthChecked = true;
         }
       )
       .addMatcher(
-        isRejected(checkAuth, loginUser, registerUser, logoutUser),
+        isRejected(checkAuth, loginUser, registerUser, logoutUser, updateUser),
         (state, action) => {
           state.isLoading = false;
           state.isAuthChecked = true;
