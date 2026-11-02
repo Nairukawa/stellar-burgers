@@ -1,9 +1,12 @@
 import { ProfileUI } from '@ui-pages';
 import { FC, SyntheticEvent, useEffect, useState } from 'react';
+import { useSelector } from '../../services/store';
+import { selectAuth } from '../../services/selectors/auth-selectors';
 
 export const Profile: FC = () => {
-  /** TODO: взять переменную из стора */
-  const user = {
+  const { user: currentUser } = useSelector(selectAuth);
+
+  const user = currentUser ?? {
     name: '',
     email: ''
   };
@@ -17,10 +20,10 @@ export const Profile: FC = () => {
   useEffect(() => {
     setFormValue((prevState) => ({
       ...prevState,
-      name: user?.name || '',
-      email: user?.email || ''
+      name: user.name,
+      email: user.email
     }));
-  }, [user]);
+  }, [user.name, user.email]);
 
   const isFormChanged =
     formValue.name !== user?.name ||

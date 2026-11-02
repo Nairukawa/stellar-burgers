@@ -1,0 +1,176 @@
+import {
+  createAsyncThunk,
+  createSlice,
+  isPending,
+  isFulfilled,
+  isRejected
+} from '@reduxjs/toolkit';
+
+import {
+  getUserApi,
+  loginUserApi,
+  registerUserApi,
+  logoutApi,
+  refreshToken
+} from '@api';
+
+import type { TLoginData, TRegisterData } from '@api';
+import type { TUser } from '@utils-types';
+
+import { getCookie, setCookie, deleteCookie } from '../../utils/cookie';
+
+type TAuthState = {
+  user: TUser | null;
+  isAuthChecked: boolean;
+  isLoading: boolean;
+  error: string | null;
+};
+
+type TAuthThunkConfig = {
+  state: {
+    auth: TAuthState;
+  };
+};
+
+const initialState: TAuthState = {
+  user: null,
+  isAuthChecked: false,
+  isLoading: false,
+  error: null
+};
+
+const saveTokens = (tokens: { accessToken: string; refreshToken: string }) => {
+  setCookie('accessToken', tokens.accessToken);
+  localStorage.setItem('refreshToken', tokens.refreshToken);
+};
+
+export const checkAuth = createAsyncThunk<TUser | null, void, TAuthThunkConfig>(
+  'auth/checkAuth',
+  async () => {
+    const accessToken = getCookie('accessToken');
+    const savedRefreshToken = localStorage.getItem('refreshToken');
+
+    if (!accessToken && !savedRefreshToken) {
+      return null;
+    }
+
+    if (!accessToken) {
+      await refreshToken();
+    }
+
+    const response = await getUserApi();
+
+    if (!response.success || !response.user) {
+      throw new Error('Не удалось проверить авторизацию');
+    }
+
+    return response.user;
+  },
+  {
+    condition: (_, { getState }) => {
+      const auth = getState().auth;
+      return !auth.isAuthChecked && !auth.isLoading;
+    }
+  }
+);
+
+export const loginUser = createAsyncThunk<TUser, TLoginData, TAuthThunkConfig>(
+  'auth/login',
+  async (data) => {
+    const response = await loginUserApi(data);
+    saveTokens(response);
+    return response.user;
+  },
+  {
+    condition: (_, { getState }) => !getState().auth.isLoading
+  }
+);
+
+export const registerUser = createAsyncThunk<
+  TUser,
+  TRegisterData,
+  TAuthThunkConfig
+>(
+  'auth/register',
+  async (data) => {
+    const response = await registerUserApi(data);
+    saveTokens(response);
+    return response.user;
+  },
+  {
+    condition: (_, { getState }) => !getState().auth.isLoading
+  }
+);
+
+export const logoutUser = createAsyncThunk<void, void, TAuthThunkConfig>(
+  'auth/logout',
+  async () => {
+    if (localStorage.getItem('refreshToken')) {
+      const response = await logoutApi();
+
+      if (!response.success) {
+        throw new Error('Не удалось выйти из аккаунта');
+      }
+    }
+
+    deleteCookie('accessToken');
+    localStorage.removeItem('refreshToken');
+  },
+  {
+    condition: (_, { getState }) => !getState().auth.isLoading
+  }
+);
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState,
+  reducers: {
+    clearAuthError: (state) => {
+      state.error = null;
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(checkAuth.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
+      .addCase(checkAuth.rejected, (state) => {
+        state.user = null;
+      })
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
+      .addCase(registerUser.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null;
+      })
+      .addMatcher(
+        isPending(checkAuth, loginUser, registerUser, logoutUser),
+        (state) => {
+          state.isLoading = true;
+          state.error = null;
+        }
+      )
+      .addMatcher(
+        isFulfilled(checkAuth, loginUser, registerUser, logoutUser),
+        (state) => {
+          state.isLoading = false;
+          state.isAuthChecked = true;
+        }
+      )
+      .addMatcher(
+        isRejected(checkAuth, loginUser, registerUser, logoutUser),
+        (state, action) => {
+          state.isLoading = false;
+          state.isAuthChecked = true;
+          state.error = action.error.message || 'Не удалось выполнить запрос';
+        }
+      );
+  }
+});
+
+export const { clearAuthError } = authSlice.actions;
+
+export default authSlice.reducer;

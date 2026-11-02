@@ -1,4 +1,5 @@
 import React, { FC } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   ConstructorElement,
@@ -6,7 +7,6 @@ import {
 } from '@zlden/react-developer-burger-ui-components';
 import styles from './burger-constructor.module.css';
 import { BurgerConstructorUIProps } from './type';
-import { TConstructorIngredient } from '@utils-types';
 import { BurgerConstructorElement, Modal } from '@components';
 import { Preloader, OrderDetailsUI } from '@ui';
 
@@ -16,9 +16,13 @@ export const BurgerConstructorUI: FC<BurgerConstructorUIProps> = ({
   price,
   orderModalData,
   onOrderClick,
-  closeOrderModal
+  closeOrderModal,
+  isOrderModalOpen = true,
+  isOrderButtonDisabled = false,
+  orderError,
+  validationError
 }) => (
-  <section className={styles.burger_constructor}>
+  <section className={styles.burger_constructor} aria-busy={orderRequest}>
     {constructorItems.bun ? (
       <div className={`${styles.element} mb-4 mr-4`}>
         <ConstructorElement
@@ -38,22 +42,20 @@ export const BurgerConstructorUI: FC<BurgerConstructorUIProps> = ({
     )}
     <ul className={styles.elements}>
       {constructorItems.ingredients.length > 0 ? (
-        constructorItems.ingredients.map(
-          (item: TConstructorIngredient, index: number) => (
-            <BurgerConstructorElement
-              ingredient={item}
-              index={index}
-              totalItems={constructorItems.ingredients.length}
-              key={item.id}
-            />
-          )
-        )
+        constructorItems.ingredients.map((item, index) => (
+          <BurgerConstructorElement
+            ingredient={item}
+            index={index}
+            totalItems={constructorItems.ingredients.length}
+            key={item.id}
+          />
+        ))
       ) : (
-        <div
+        <li
           className={`${styles.noBuns} ml-8 mb-4 mr-5 text text_type_main-default`}
         >
           Выберите начинку
-        </div>
+        </li>
       )}
     </ul>
     {constructorItems.bun ? (
@@ -82,23 +84,63 @@ export const BurgerConstructorUI: FC<BurgerConstructorUIProps> = ({
         htmlType='button'
         type='primary'
         size='large'
-        children='Оформить заказ'
+        disabled={isOrderButtonDisabled || orderRequest}
         onClick={onOrderClick}
-      />
+      >
+        Оформить заказ
+      </Button>
     </div>
 
-    {orderRequest && (
-      <Modal onClose={closeOrderModal} title={'Оформляем заказ...'}>
-        <Preloader />
-      </Modal>
+    {validationError && (
+      <p role='alert' className='text text_type_main-default mt-4'>
+        {validationError}
+      </p>
     )}
 
-    {orderModalData && (
+    {orderRequest && !isOrderModalOpen && (
+      <p role='status' className='text text_type_main-default mt-4'>
+        Заказ отправляется. Дождитесь результата перед изменением бургера.
+      </p>
+    )}
+
+    {isOrderModalOpen && (orderRequest || orderError || orderModalData) && (
       <Modal
         onClose={closeOrderModal}
-        title={orderRequest ? 'Оформляем заказ...' : ''}
+        title={
+          orderRequest
+            ? 'Оформляем заказ...'
+            : orderError
+              ? 'Не удалось оформить заказ'
+              : ''
+        }
       >
-        <OrderDetailsUI orderNumber={orderModalData.number} />
+        {orderRequest ? (
+          <Preloader />
+        ) : orderError ? (
+          <>
+            <p role='alert' className='text text_type_main-default mb-6'>
+              {orderError}
+            </p>
+            <Button
+              htmlType='button'
+              type='primary'
+              size='medium'
+              onClick={onOrderClick}
+              disabled={isOrderButtonDisabled}
+            >
+              Повторить
+            </Button>
+          </>
+        ) : orderModalData ? (
+          <>
+            <OrderDetailsUI orderNumber={orderModalData.number} />
+            <p className='text text_type_main-default mt-6 mb-6'>
+              <Link to='/profile/orders' onClick={closeOrderModal}>
+                Перейти в историю заказов
+              </Link>
+            </p>
+          </>
+        ) : null}
       </Modal>
     )}
   </section>
