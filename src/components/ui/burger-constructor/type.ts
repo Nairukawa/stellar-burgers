@@ -10,8 +10,4 @@ export type BurgerConstructorUIProps = {
   orderModalData: TOrder | null;
   onOrderClick: () => void;
   closeOrderModal: () => void;
-  isOrderModalOpen?: boolean;
-  isOrderButtonDisabled?: boolean;
-  orderError?: string | null;
-  validationError?: string | null;
 };

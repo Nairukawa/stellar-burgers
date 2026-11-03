@@ -8,14 +8,18 @@ import {
 import authReducer from './slices/auth-slice';
 import ingredientsReducer from './slices/ingredients-slice';
 import constructorReducer from './slices/constructor-slice';
-import ordersReducer from './slices/orders-slice';
+import orderSubmissionReducer from './slices/order-submission-slice';
+import profileOrdersReducer from './slices/profile-orders-slice';
+import orderDetailsReducer from './slices/order-details-slice';
 import feedReducer from './slices/feed-slice';
 
-const rootReducer = combineReducers({
+export const rootReducer = combineReducers({
   ingredients: ingredientsReducer,
   auth: authReducer,
   burgerConstructor: constructorReducer,
-  orders: ordersReducer,
+  orderSubmission: orderSubmissionReducer,
+  profileOrders: profileOrdersReducer,
+  orderDetails: orderDetailsReducer,
   feed: feedReducer
 });
 

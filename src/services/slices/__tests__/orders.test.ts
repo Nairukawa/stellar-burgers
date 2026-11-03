@@ -1,13 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { getOrderByNumberApi, getOrdersApi, orderBurgerApi } from '@api';
 import authReducer, { loginUser, logoutUser } from '../auth-slice';
-import constructorReducer, { addIngredient } from '../constructor-slice';
-import ordersReducer, {
-  clearOrderSubmission,
-  fetchOrderDetails,
-  fetchProfileOrders,
-  submitOrder
-} from '../orders-slice';
+import { addIngredient } from '../constructor-slice';
+import { rootReducer } from '../../store';
+import { clearOrderSubmission, submitOrder } from '../order-submission-slice';
+import { fetchOrderDetails } from '../order-details-slice';
+import { fetchProfileOrders } from '../profile-orders-slice';
 import type { TIngredient, TOrder } from '@utils-types';
 
 jest.mock('@api', () => ({
@@ -69,11 +67,7 @@ const responseFor = (
 
 const createTestStore = (loggedIn = true) =>
   configureStore({
-    reducer: {
-      auth: authReducer,
-      burgerConstructor: constructorReducer,
-      orders: ordersReducer
-    },
+    reducer: rootReducer,
     preloadedState: {
       auth: {
         ...authReducer(undefined, { type: 'test/init' }),
@@ -112,7 +106,7 @@ describe('creating an order', () => {
     expect(postOrder).not.toHaveBeenCalled();
     expect(store.getState().burgerConstructor.bun?._id).toBe('bun');
     expect(store.getState().burgerConstructor.ingredients).toHaveLength(1);
-    expect(store.getState().orders.submission.status).toBe('idle');
+    expect(store.getState().orderSubmission.status).toBe('idle');
   });
 
   it('requires a bun before contacting the server', async () => {
@@ -122,7 +116,7 @@ describe('creating an order', () => {
     await store.dispatch(submitOrder());
 
     expect(postOrder).not.toHaveBeenCalled();
-    expect(store.getState().orders.submission.error).toBe(
+    expect(store.getState().orderSubmission.error).toBe(
       'Добавьте булку в бургер'
     );
     expect(store.getState().burgerConstructor.requestId).toBeNull();
@@ -146,12 +140,13 @@ describe('creating an order', () => {
       ingredients: [],
       requestId: null
     });
-    expect(store.getState().orders.submission).toMatchObject({
+    expect(store.getState().orderSubmission).toMatchObject({
       status: 'succeeded',
       error: null,
+      isModalOpen: true,
       order: { number: 101, ingredients: ingredientIds }
     });
-    expect(store.getState().orders.history.items).toEqual([
+    expect(store.getState().profileOrders.items).toEqual([
       { ...returnedOrder, ingredients: ingredientIds }
     ]);
   });
@@ -164,14 +159,28 @@ describe('creating an order', () => {
 
     const firstRequest = store.dispatch(submitOrder());
     await store.dispatch(submitOrder());
+    expect(store.getState().orderSubmission.isModalOpen).toBe(true);
     store.dispatch(clearOrderSubmission());
 
     expect(postOrder).toHaveBeenCalledTimes(1);
-    expect(store.getState().orders.submission.status).toBe('loading');
+    expect(store.getState().orderSubmission).toMatchObject({
+      status: 'loading',
+      requestId: firstRequest.requestId,
+      isModalOpen: false
+    });
 
     pending.resolve(responseFor(makeOrder(102)));
     await firstRequest;
-    expect(store.getState().orders.submission.status).toBe('succeeded');
+    expect(store.getState().orderSubmission).toMatchObject({
+      status: 'succeeded',
+      isModalOpen: true
+    });
+    store.dispatch(clearOrderSubmission());
+    expect(store.getState().orderSubmission).toMatchObject({
+      status: 'idle',
+      order: null,
+      isModalOpen: false
+    });
   });
 
   it('keeps the burger after a failed request and can retry it', async () => {
@@ -182,9 +191,10 @@ describe('creating an order', () => {
 
     await store.dispatch(submitOrder());
 
-    expect(store.getState().orders.submission).toMatchObject({
+    expect(store.getState().orderSubmission).toMatchObject({
       status: 'failed',
-      error: 'Connection failed'
+      error: 'Connection failed',
+      isModalOpen: false
     });
     expect(store.getState().burgerConstructor.bun?._id).toBe('bun');
     expect(store.getState().burgerConstructor.ingredients).toEqual(
@@ -195,8 +205,8 @@ describe('creating an order', () => {
     postOrder.mockResolvedValueOnce(responseFor(makeOrder(103)));
     await store.dispatch(submitOrder());
     expect(postOrder).toHaveBeenNthCalledWith(2, ['bun', 'filling', 'bun']);
-    expect(store.getState().orders.submission.status).toBe('succeeded');
-    expect(store.getState().orders.submission.error).toBeNull();
+    expect(store.getState().orderSubmission.status).toBe('succeeded');
+    expect(store.getState().orderSubmission.error).toBeNull();
   });
 
   it('does not restore an old order or clear a new burger after the session changes', async () => {
@@ -224,8 +234,8 @@ describe('creating an order', () => {
     pending.resolve(responseFor(makeOrder(104)));
     await request;
 
-    expect(store.getState().orders.submission.order).toBeNull();
-    expect(store.getState().orders.history.items).toEqual([]);
+    expect(store.getState().orderSubmission.order).toBeNull();
+    expect(store.getState().profileOrders.items).toEqual([]);
     expect(store.getState().burgerConstructor.bun?._id).toBe('new-bun');
   });
 });
@@ -242,7 +252,7 @@ describe('personal order history', () => {
     getHistory.mockResolvedValueOnce([]);
 
     await store.dispatch(fetchProfileOrders());
-    expect(store.getState().orders.history).toMatchObject({
+    expect(store.getState().profileOrders).toMatchObject({
       items: [],
       status: 'succeeded',
       error: null
@@ -250,7 +260,7 @@ describe('personal order history', () => {
 
     getHistory.mockRejectedValueOnce(new Error('History is unavailable'));
     await store.dispatch(fetchProfileOrders());
-    expect(store.getState().orders.history).toMatchObject({
+    expect(store.getState().profileOrders).toMatchObject({
       status: 'failed',
       error: 'History is unavailable'
     });
@@ -258,9 +268,9 @@ describe('personal order history', () => {
     getHistory.mockResolvedValueOnce([makeOrder(201)]);
     await store.dispatch(fetchProfileOrders());
     expect(
-      store.getState().orders.history.items.map((order) => order.number)
+      store.getState().profileOrders.items.map((order) => order.number)
     ).toEqual([201]);
-    expect(store.getState().orders.history.error).toBeNull();
+    expect(store.getState().profileOrders.error).toBeNull();
   });
 
   it.each(['logout', 'new login'] as const)(
@@ -284,7 +294,7 @@ describe('personal order history', () => {
 
       pending.resolve([makeOrder(202)]);
       await request;
-      expect(store.getState().orders.history).toMatchObject({
+      expect(store.getState().profileOrders).toMatchObject({
         items: [],
         status: 'idle',
         error: null
@@ -305,7 +315,7 @@ describe('personal order history', () => {
     await historyRequest;
 
     expect(
-      store.getState().orders.history.items.map((order) => order.number)
+      store.getState().profileOrders.items.map((order) => order.number)
     ).toEqual([203]);
   });
 
@@ -329,7 +339,7 @@ describe('personal order history', () => {
         pendingPost.resolve(responseFor(newOrder));
         await submissionRequest;
 
-        expect(store.getState().orders.history).toMatchObject({
+        expect(store.getState().profileOrders).toMatchObject({
           status: 'loading',
           requestId: historyRequest.requestId
         });
@@ -345,9 +355,9 @@ describe('personal order history', () => {
       }
 
       expect(
-        store.getState().orders.history.items.map((order) => order.number)
+        store.getState().profileOrders.items.map((order) => order.number)
       ).toEqual([205, 204]);
-      expect(store.getState().orders.history).toMatchObject({
+      expect(store.getState().profileOrders).toMatchObject({
         status: 'succeeded',
         error: null,
         requestId: null
@@ -367,7 +377,7 @@ describe('order details', () => {
 
     expect(getHistory).toHaveBeenCalledTimes(1);
     expect(getPublicOrder).not.toHaveBeenCalled();
-    expect(store.getState().orders.details).toMatchObject({
+    expect(store.getState().orderDetails).toMatchObject({
       number: 999,
       isPrivate: true,
       status: 'succeeded',
@@ -387,7 +397,7 @@ describe('order details', () => {
     });
     await store.dispatch(fetchOrderDetails({ number: 302, isPrivate: false }));
     expect(getPublicOrder).toHaveBeenCalledWith(302);
-    expect(store.getState().orders.details.order?.number).toBe(302);
+    expect(store.getState().orderDetails.order?.number).toBe(302);
   });
 
   it.each(['success', 'failure'] as const)(
@@ -417,7 +427,7 @@ describe('order details', () => {
       }
       await firstRequest;
 
-      expect(store.getState().orders.details).toMatchObject({
+      expect(store.getState().orderDetails).toMatchObject({
         number: 304,
         status: 'succeeded',
         error: null,
@@ -449,8 +459,8 @@ describe('order details', () => {
       pending.resolve([makeOrder(305)]);
       await request;
 
-      expect(store.getState().orders.details.order).toBeNull();
-      expect(store.getState().orders.details.status).toBe('idle');
+      expect(store.getState().orderDetails.order).toBeNull();
+      expect(store.getState().orderDetails.status).toBe('idle');
     }
   );
 
@@ -458,7 +468,7 @@ describe('order details', () => {
     const store = createTestStore(false);
     await store.dispatch(fetchOrderDetails({ number: -1, isPrivate: false }));
     expect(getPublicOrder).not.toHaveBeenCalled();
-    expect(store.getState().orders.details).toMatchObject({
+    expect(store.getState().orderDetails).toMatchObject({
       status: 'succeeded',
       order: null
     });

@@ -4,7 +4,7 @@ import constructorReducer, {
   moveIngredient,
   removeIngredient
 } from '../constructor-slice';
-import { submitOrder } from '../orders-slice';
+import { submitOrder } from '../order-submission-slice';
 import { loginUser, logoutUser } from '../auth-slice';
 import {
   selectConstructorCounters,

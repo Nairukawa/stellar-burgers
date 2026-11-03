@@ -12,7 +12,7 @@ import {
   selectIngredientsError,
   selectIngredientsStatus
 } from '../../services/selectors/ingredients-selectors';
-import { fetchOrderDetails } from '../../services/slices/orders-slice';
+import { fetchOrderDetails } from '../../services/slices/order-details-slice';
 import { fetchIngredients } from '../../services/slices/ingredients-slice';
 
 export const OrderInfo: FC = () => {
@@ -136,20 +136,5 @@ export const OrderInfo: FC = () => {
     return <Preloader />;
   }
 
-  const knownIngredientsCount = Object.values(orderInfo.ingredientsInfo).reduce(
-    (sum, item) => sum + item.count,
-    0
-  );
-
-  return (
-    <>
-      {knownIngredientsCount < orderInfo.ingredients.length && (
-        <p className='text text_type_main-small text_color_inactive'>
-          Данные части ингредиентов недоступны. Стоимость указана по доступным
-          ингредиентам.
-        </p>
-      )}
-      <OrderInfoUI orderInfo={orderInfo} />
-    </>
-  );
+  return <OrderInfoUI orderInfo={orderInfo} />;
 };

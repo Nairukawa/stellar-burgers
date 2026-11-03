@@ -5,6 +5,8 @@ import {
   isFulfilled,
   isRejected
 } from '@reduxjs/toolkit';
+import type { Reducer } from '@reduxjs/toolkit';
+import type { TThunkConfig } from '../types';
 
 import {
   getUserApi,
@@ -27,12 +29,6 @@ type TAuthState = {
   error: string | null;
 };
 
-type TAuthThunkConfig = {
-  state: {
-    auth: TAuthState;
-  };
-};
-
 const initialState: TAuthState = {
   user: null,
   isAuthChecked: false,
@@ -45,7 +41,7 @@ const saveTokens = (tokens: { accessToken: string; refreshToken: string }) => {
   localStorage.setItem('refreshToken', tokens.refreshToken);
 };
 
-export const checkAuth = createAsyncThunk<TUser | null, void, TAuthThunkConfig>(
+export const checkAuth = createAsyncThunk<TUser | null, void, TThunkConfig>(
   'auth/checkAuth',
   async () => {
     const accessToken = getCookie('accessToken');
@@ -75,7 +71,7 @@ export const checkAuth = createAsyncThunk<TUser | null, void, TAuthThunkConfig>(
   }
 );
 
-export const loginUser = createAsyncThunk<TUser, TLoginData, TAuthThunkConfig>(
+export const loginUser = createAsyncThunk<TUser, TLoginData, TThunkConfig>(
   'auth/login',
   async (data) => {
     const response = await loginUserApi(data);
@@ -90,7 +86,7 @@ export const loginUser = createAsyncThunk<TUser, TLoginData, TAuthThunkConfig>(
 export const registerUser = createAsyncThunk<
   TUser,
   TRegisterData,
-  TAuthThunkConfig
+  TThunkConfig
 >(
   'auth/register',
   async (data) => {
@@ -103,7 +99,7 @@ export const registerUser = createAsyncThunk<
   }
 );
 
-export const logoutUser = createAsyncThunk<void, void, TAuthThunkConfig>(
+export const logoutUser = createAsyncThunk<void, void, TThunkConfig>(
   'auth/logout',
   async () => {
     if (localStorage.getItem('refreshToken')) {
@@ -125,7 +121,7 @@ export const logoutUser = createAsyncThunk<void, void, TAuthThunkConfig>(
 export const updateUser = createAsyncThunk<
   TUser,
   Partial<TRegisterData>,
-  TAuthThunkConfig
+  TThunkConfig
 >(
   'auth/updateUser',
   async (data) => {
@@ -200,4 +196,5 @@ const authSlice = createSlice({
 
 export const { clearAuthError } = authSlice.actions;
 
-export default authSlice.reducer;
+const authReducer: Reducer<TAuthState> = authSlice.reducer;
+export default authReducer;

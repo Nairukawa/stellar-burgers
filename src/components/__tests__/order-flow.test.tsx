@@ -9,12 +9,10 @@ import {
   waitFor,
   within
 } from '@testing-library/react';
-import authReducer from '../../services/slices/auth-slice';
-import ingredientsReducer from '../../services/slices/ingredients-slice';
-import constructorReducer from '../../services/slices/constructor-slice';
-import ordersReducer from '../../services/slices/orders-slice';
+import { rootReducer } from '../../services/store';
 import {
   getIngredientsApi,
+  getFeedsApi,
   getOrdersApi,
   getOrderByNumberApi,
   loginUserApi,
@@ -99,25 +97,50 @@ beforeEach(() => {
     }
   });
   jest.mocked(getOrdersApi).mockResolvedValue([order]);
+  jest.mocked(getFeedsApi).mockResolvedValue({
+    success: true,
+    orders: [order],
+    total: 100,
+    totalToday: 10
+  });
+  jest.mocked(getOrderByNumberApi).mockResolvedValue({
+    success: true,
+    orders: [order]
+  });
 });
 
-test('guest builds a burger, signs in, submits once and sees the order in personal history', async () => {
+type TInitialEntry = NonNullable<
+  React.ComponentProps<typeof MemoryRouter>['initialEntries']
+>[number];
+
+const renderApp = (entry: TInitialEntry = '/', authenticated = false) => {
+  const initial = rootReducer(undefined, { type: '@@init' });
   const store = configureStore({
-    reducer: {
-      auth: authReducer,
-      ingredients: ingredientsReducer,
-      burgerConstructor: constructorReducer,
-      orders: ordersReducer
+    reducer: rootReducer,
+    preloadedState: {
+      ...initial,
+      auth: {
+        ...initial.auth,
+        isAuthChecked: authenticated,
+        user: authenticated
+          ? { name: 'Тестовый пользователь', email: 'test@example.com' }
+          : null
+      }
     }
   });
 
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={[entry]}>
         <App />
       </MemoryRouter>
     </Provider>
   );
+  return store;
+};
+
+test('guest builds a burger, signs in, submits once and sees the order in personal history', async () => {
+  const store = renderApp();
 
   const bunCard = (await screen.findByText(bun.name)).closest('li');
   const fillingCard = screen.getByText(filling.name).closest('li');
@@ -147,25 +170,195 @@ test('guest builds a burger, signs in, submits once and sees the order in person
   expect(orderBurgerApi).not.toHaveBeenCalled();
   fireEvent.click(orderButton);
 
-  const historyLink = await screen.findByRole('link', {
-    name: 'Перейти в историю заказов'
+  await within(document.getElementById('modals')!).findByRole('heading', {
+    name: String(order.number)
   });
+  expect(
+    screen.queryByRole('link', { name: 'Перейти в историю заказов' })
+  ).toBeNull();
   expect(orderBurgerApi).toHaveBeenCalledTimes(1);
   expect(orderBurgerApi).toHaveBeenCalledWith(['bun-1', 'main-1', 'bun-1']);
   expect(store.getState().burgerConstructor.bun).toBeNull();
   expect(store.getState().burgerConstructor.ingredients).toEqual([]);
 
-  fireEvent.click(historyLink);
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(document.getElementById('modals')!.childElementCount).toBe(0);
+  fireEvent.click(screen.getByRole('link', { name: 'Тестовый пользователь' }));
+  fireEvent.click(await screen.findByRole('link', { name: 'История заказов' }));
   await screen.findByText(order.name);
   expect(getOrdersApi).toHaveBeenCalled();
-  expect(store.getState().orders.history.items).toEqual([order]);
+  expect(store.getState().profileOrders.items).toEqual([order]);
 
   const orderLink = screen.getByText(order.name).closest('a');
   expect(orderLink).not.toBeNull();
   fireEvent.click(orderLink!);
   await screen.findByText('Состав:');
   await waitFor(() =>
-    expect(store.getState().orders.details.order?.number).toBe(order.number)
+    expect(store.getState().orderDetails.order?.number).toBe(order.number)
   );
+  expect(
+    within(document.getElementById('modals')!).getByRole('heading', {
+      name: '#12345'
+    })
+  ).toBeTruthy();
+  expect(
+    screen
+      .getByRole('link', { name: 'Тестовый пользователь' })
+      .getAttribute('aria-current')
+  ).toBe('page');
   expect(getOrderByNumberApi).not.toHaveBeenCalled();
+});
+
+describe.each([false, true])(
+  'standalone details with saved background = %s',
+  (savedBackground) => {
+    test.each([
+      {
+        path: '/ingredients/bun-1',
+        title: 'Детали ингредиента',
+        content: bun.name,
+        authenticated: false,
+        section: 'Конструктор',
+        background: '/'
+      },
+      {
+        path: '/feed/12345',
+        title: '#12345',
+        content: order.name,
+        authenticated: false,
+        section: 'Лента заказов',
+        background: '/feed'
+      },
+      {
+        path: '/profile/orders/12345',
+        title: '#12345',
+        content: order.name,
+        authenticated: true,
+        section: 'Тестовый пользователь',
+        background: '/profile/orders'
+      }
+    ])(
+      '$path renders a page, including after a refresh',
+      async ({ path, title, content, authenticated, section, background }) => {
+        renderApp(
+          {
+            pathname: path,
+            key: 'initial-details',
+            state: savedBackground
+              ? {
+                  background: {
+                    pathname: background,
+                    search: '',
+                    hash: '',
+                    state: null,
+                    key: 'old-page'
+                  }
+                }
+              : null
+          },
+          authenticated
+        );
+
+        await screen.findByText(content);
+        expect(
+          screen.getByRole('heading', { level: 1, name: title })
+        ).toBeTruthy();
+        expect(document.getElementById('modals')!.childElementCount).toBe(0);
+        expect(
+          screen
+            .getByRole('link', { name: section })
+            .querySelector('svg')
+            ?.getAttribute('fill')
+        ).toBe('#F2F2F3');
+        if (authenticated) {
+          expect(getOrderByNumberApi).not.toHaveBeenCalled();
+          expect(getOrdersApi).toHaveBeenCalled();
+        }
+      }
+    );
+  }
+);
+
+test.each([
+  {
+    start: '/',
+    card: bun.name,
+    title: 'Детали ингредиента',
+    section: 'Конструктор'
+  },
+  {
+    start: '/feed',
+    card: order.name,
+    title: '#12345',
+    section: 'Лента заказов'
+  }
+])(
+  'clicking a card from $start opens a modal and preserves the page',
+  async ({ start, card, title, section }) => {
+    renderApp(start);
+    const cardLink = (await screen.findByText(card)).closest('a');
+    expect(cardLink).not.toBeNull();
+    fireEvent.click(cardLink!);
+
+    const modal = document.getElementById('modals')!;
+    await within(modal).findByRole('heading', { name: title });
+    expect(
+      screen
+        .getByRole('link', { name: section })
+        .querySelector('svg')
+        ?.getAttribute('fill')
+    ).toBe('#F2F2F3');
+    expect(cardLink!.isConnected).toBe(true);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(modal.childElementCount).toBe(0));
+    expect(screen.getByText(card)).toBeTruthy();
+  }
+);
+
+test('a guest returns to a protected standalone order page after signing in', async () => {
+  renderApp('/profile/orders/12345');
+  fireEvent.change(await screen.findByRole('textbox'), {
+    target: { value: 'test@example.com' }
+  });
+  fireEvent.change(document.querySelector('input[name="password"]')!, {
+    target: { value: 'test-password' }
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Войти' }));
+
+  await screen.findByText('Состав:');
+  expect(
+    screen.getByRole('heading', { level: 1, name: '#12345' })
+  ).toBeTruthy();
+  expect(document.getElementById('modals')!.childElementCount).toBe(0);
+  expect(getOrderByNumberApi).not.toHaveBeenCalled();
+});
+
+test('a failed order is shown by the container and the burger can be retried', async () => {
+  jest
+    .mocked(orderBurgerApi)
+    .mockRejectedValueOnce(new Error('Сервер недоступен'));
+  const store = renderApp('/', true);
+  const bunCard = (await screen.findByText(bun.name)).closest('li');
+  const fillingCard = screen.getByText(filling.name).closest('li');
+  fireEvent.click(within(bunCard!).getByRole('button', { name: 'Добавить' }));
+  fireEvent.click(
+    within(fillingCard!).getByRole('button', { name: 'Добавить' })
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Оформить заказ' }));
+
+  expect((await screen.findByRole('alert')).textContent).toBe(
+    'Сервер недоступен'
+  );
+  expect(document.getElementById('modals')!.childElementCount).toBe(0);
+  expect(store.getState().burgerConstructor.ingredients).toHaveLength(1);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Вернуться к конструктору' })
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Оформить заказ' }));
+
+  await within(document.getElementById('modals')!).findByRole('heading', {
+    name: String(order.number)
+  });
+  expect(orderBurgerApi).toHaveBeenCalledTimes(2);
+  expect(store.getState().burgerConstructor.bun).toBeNull();
 });

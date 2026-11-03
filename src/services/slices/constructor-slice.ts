@@ -1,7 +1,8 @@
 import { createSlice, nanoid, PayloadAction } from '@reduxjs/toolkit';
+import type { Reducer } from '@reduxjs/toolkit';
 import type { TConstructorIngredient, TIngredient } from '@utils-types';
 import { loginUser, logoutUser, registerUser } from './auth-slice';
-import { submitOrder } from './orders-slice';
+import { submitOrder } from './order-submission-slice';
 
 export type TConstructorState = {
   bun: TIngredient | null;
@@ -90,4 +91,5 @@ export const {
   clearConstructor
 } = constructorSlice.actions;
 
-export default constructorSlice.reducer;
+const constructorReducer: Reducer<TConstructorState> = constructorSlice.reducer;
+export default constructorReducer;

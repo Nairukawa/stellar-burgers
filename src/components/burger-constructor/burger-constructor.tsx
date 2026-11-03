@@ -1,4 +1,5 @@
-import { FC, useEffect, useState } from 'react';
+import { FC } from 'react';
+import { Button } from '@zlden/react-developer-burger-ui-components';
 import { BurgerConstructorUI } from '@ui';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from '../../services/store';
@@ -11,7 +12,7 @@ import { selectOrderSubmission } from '../../services/selectors/orders-selectors
 import {
   clearOrderSubmission,
   submitOrder
-} from '../../services/slices/orders-slice';
+} from '../../services/slices/order-submission-slice';
 
 export const BurgerConstructor: FC = () => {
   const navigate = useNavigate();
@@ -21,30 +22,13 @@ export const BurgerConstructor: FC = () => {
   const constructorItems = useSelector(selectConstructor);
   const price = useSelector(selectConstructorPrice);
   const submission = useSelector(selectOrderSubmission);
-  const orderRequest = submission.status === 'loading';
-
-  const [isOrderModalOpen, setIsOrderModalOpen] = useState(
-    () => submission.status !== 'idle'
-  );
-  const [validationError, setValidationError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (submission.status === 'succeeded' || submission.status === 'failed') {
-      setIsOrderModalOpen(true);
-    } else if (submission.status === 'idle') {
-      setIsOrderModalOpen(false);
-    }
-  }, [submission.status]);
-
-  useEffect(() => {
-    if (constructorItems.bun) setValidationError(null);
-  }, [constructorItems.bun]);
+  const isSubmitting = submission.status === 'loading';
 
   const onOrderClick = () => {
     if (
       !isAuthChecked ||
       isLoading ||
-      orderRequest ||
+      isSubmitting ||
       constructorItems.requestId !== null
     ) {
       return;
@@ -55,42 +39,36 @@ export const BurgerConstructor: FC = () => {
       return;
     }
 
-    if (!constructorItems.bun) {
-      setValidationError('Добавьте булку, чтобы оформить заказ');
-      return;
-    }
+    if (!constructorItems.bun) return;
 
-    setValidationError(null);
-    setIsOrderModalOpen(true);
     dispatch(submitOrder());
   };
 
   const closeOrderModal = () => {
-    setIsOrderModalOpen(false);
-    if (!orderRequest) dispatch(clearOrderSubmission());
+    dispatch(clearOrderSubmission());
   };
+
+  if (submission.status === 'failed') {
+    return (
+      <div>
+        <p role='alert' className='text text_type_main-default mb-4'>
+          {submission.error || 'Не удалось оформить заказ'}
+        </p>
+        <Button htmlType='button' type='secondary' onClick={closeOrderModal}>
+          Вернуться к конструктору
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <BurgerConstructorUI
       price={price}
-      orderRequest={orderRequest}
+      orderRequest={submission.isModalOpen && isSubmitting}
       constructorItems={constructorItems}
-      orderModalData={submission.order}
+      orderModalData={submission.isModalOpen ? submission.order : null}
       onOrderClick={onOrderClick}
       closeOrderModal={closeOrderModal}
-      isOrderModalOpen={isOrderModalOpen}
-      orderError={
-        submission.status === 'failed'
-          ? submission.error || 'Не удалось оформить заказ'
-          : null
-      }
-      validationError={validationError}
-      isOrderButtonDisabled={
-        !isAuthChecked ||
-        isLoading ||
-        orderRequest ||
-        constructorItems.requestId !== null
-      }
     />
   );
 };

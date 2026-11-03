@@ -1,9 +1,11 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import type { Reducer } from '@reduxjs/toolkit';
 import { getFeedsApi } from '@api';
 import type { TOrdersData } from '@utils-types';
+import type { TRequestStatus, TThunkConfig } from '../types';
 
 type TFeedState = TOrdersData & {
-  status: 'idle' | 'loading' | 'succeeded' | 'failed';
+  status: TRequestStatus;
   error: string | null;
 };
 
@@ -15,13 +17,13 @@ const initialState: TFeedState = {
   error: null
 };
 
-export const fetchFeed = createAsyncThunk<
-  TOrdersData,
-  void,
-  { state: { feed: TFeedState } }
->('feed/fetch', async () => getFeedsApi(), {
-  condition: (_, { getState }) => getState().feed.status !== 'loading'
-});
+export const fetchFeed = createAsyncThunk<TOrdersData, void, TThunkConfig>(
+  'feed/fetch',
+  async () => getFeedsApi(),
+  {
+    condition: (_, { getState }) => getState().feed.status !== 'loading'
+  }
+);
 
 const feedSlice = createSlice({
   name: 'feed',
@@ -47,4 +49,5 @@ const feedSlice = createSlice({
   }
 });
 
-export default feedSlice.reducer;
+const feedReducer: Reducer<TFeedState> = feedSlice.reducer;
+export default feedReducer;

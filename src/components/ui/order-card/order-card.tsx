@@ -32,11 +32,6 @@ export const OrderCardUI: FC<OrderCardUIProps> = memo(
       {locationState.background?.pathname === '/profile/orders' && (
         <OrderStatus status={orderInfo.status} />
       )}
-      {orderInfo.ingredientsInfo.length < orderInfo.ingredients.length && (
-        <p className='text text_type_main-small text_color_inactive pt-2'>
-          Стоимость указана по доступным ингредиентам.
-        </p>
-      )}
       <div className={`pt-6 ${styles.order_content}`}>
         <ul className={styles.ingredients}>
           {orderInfo.ingredientsToShow.map((ingredient, index) => {

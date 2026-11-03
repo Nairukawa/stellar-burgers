@@ -1,10 +1,12 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import type { Reducer } from '@reduxjs/toolkit';
 import { getIngredientsApi } from '@api';
 import type { TIngredient } from '@utils-types';
+import type { TRequestStatus, TThunkConfig } from '../types';
 
 type TIngredientsState = {
   items: TIngredient[];
-  status: 'idle' | 'loading' | 'succeeded' | 'failed';
+  status: TRequestStatus;
   error: string | null;
 };
 
@@ -14,10 +16,11 @@ const initialState: TIngredientsState = {
   error: null
 };
 
-export const fetchIngredients = createAsyncThunk<TIngredient[]>(
-  'ingredients/fetchIngredients',
-  async () => getIngredientsApi()
-);
+export const fetchIngredients = createAsyncThunk<
+  TIngredient[],
+  void,
+  TThunkConfig
+>('ingredients/fetchIngredients', async () => getIngredientsApi());
 
 const ingredientsSlice = createSlice({
   name: 'ingredients',
@@ -42,4 +45,5 @@ const ingredientsSlice = createSlice({
   }
 });
 
-export default ingredientsSlice.reducer;
+const ingredientsReducer: Reducer<TIngredientsState> = ingredientsSlice.reducer;
+export default ingredientsReducer;

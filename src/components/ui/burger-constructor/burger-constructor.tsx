@@ -1,5 +1,4 @@
 import React, { FC } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Button,
   ConstructorElement,
@@ -7,6 +6,7 @@ import {
 } from '@zlden/react-developer-burger-ui-components';
 import styles from './burger-constructor.module.css';
 import { BurgerConstructorUIProps } from './type';
+import { TConstructorIngredient } from '@utils-types';
 import { BurgerConstructorElement, Modal } from '@components';
 import { Preloader, OrderDetailsUI } from '@ui';
 
@@ -16,13 +16,9 @@ export const BurgerConstructorUI: FC<BurgerConstructorUIProps> = ({
   price,
   orderModalData,
   onOrderClick,
-  closeOrderModal,
-  isOrderModalOpen = true,
-  isOrderButtonDisabled = false,
-  orderError,
-  validationError
+  closeOrderModal
 }) => (
-  <section className={styles.burger_constructor} aria-busy={orderRequest}>
+  <section className={styles.burger_constructor}>
     {constructorItems.bun ? (
       <div className={`${styles.element} mb-4 mr-4`}>
         <ConstructorElement
@@ -42,14 +38,16 @@ export const BurgerConstructorUI: FC<BurgerConstructorUIProps> = ({
     )}
     <ul className={styles.elements}>
       {constructorItems.ingredients.length > 0 ? (
-        constructorItems.ingredients.map((item, index) => (
-          <BurgerConstructorElement
-            ingredient={item}
-            index={index}
-            totalItems={constructorItems.ingredients.length}
-            key={item.id}
-          />
-        ))
+        constructorItems.ingredients.map(
+          (item: TConstructorIngredient, index: number) => (
+            <BurgerConstructorElement
+              ingredient={item}
+              index={index}
+              totalItems={constructorItems.ingredients.length}
+              key={item.id}
+            />
+          )
+        )
       ) : (
         <li
           className={`${styles.noBuns} ml-8 mb-4 mr-5 text text_type_main-default`}
@@ -84,63 +82,23 @@ export const BurgerConstructorUI: FC<BurgerConstructorUIProps> = ({
         htmlType='button'
         type='primary'
         size='large'
-        disabled={isOrderButtonDisabled || orderRequest}
+        children='Оформить заказ'
         onClick={onOrderClick}
-      >
-        Оформить заказ
-      </Button>
+      />
     </div>
 
-    {validationError && (
-      <p role='alert' className='text text_type_main-default mt-4'>
-        {validationError}
-      </p>
+    {orderRequest && (
+      <Modal onClose={closeOrderModal} title={'Оформляем заказ...'}>
+        <Preloader />
+      </Modal>
     )}
 
-    {orderRequest && !isOrderModalOpen && (
-      <p role='status' className='text text_type_main-default mt-4'>
-        Заказ отправляется. Дождитесь результата перед изменением бургера.
-      </p>
-    )}
-
-    {isOrderModalOpen && (orderRequest || orderError || orderModalData) && (
+    {orderModalData && (
       <Modal
         onClose={closeOrderModal}
-        title={
-          orderRequest
-            ? 'Оформляем заказ...'
-            : orderError
-              ? 'Не удалось оформить заказ'
-              : ''
-        }
+        title={orderRequest ? 'Оформляем заказ...' : ''}
       >
-        {orderRequest ? (
-          <Preloader />
-        ) : orderError ? (
-          <>
-            <p role='alert' className='text text_type_main-default mb-6'>
-              {orderError}
-            </p>
-            <Button
-              htmlType='button'
-              type='primary'
-              size='medium'
-              onClick={onOrderClick}
-              disabled={isOrderButtonDisabled}
-            >
-              Повторить
-            </Button>
-          </>
-        ) : orderModalData ? (
-          <>
-            <OrderDetailsUI orderNumber={orderModalData.number} />
-            <p className='text text_type_main-default mt-6 mb-6'>
-              <Link to='/profile/orders' onClick={closeOrderModal}>
-                Перейти в историю заказов
-              </Link>
-            </p>
-          </>
-        ) : null}
+        <OrderDetailsUI orderNumber={orderModalData.number} />
       </Modal>
     )}
   </section>

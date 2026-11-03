@@ -1,6 +1,13 @@
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Route,
+  Routes,
+  useLocation,
+  useMatch,
+  useNavigate
+} from 'react-router-dom';
 import type { Location } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import clsx from 'clsx';
 import { useDispatch } from '../../services/store';
 import { fetchIngredients } from '../../services/slices/ingredients-slice';
 import { checkAuth } from '../../services/slices/auth-slice';
@@ -31,6 +38,9 @@ type LocationState = {
 const App = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const feedOrderMatch = useMatch('/feed/:number');
+  const profileOrderMatch = useMatch('/profile/orders/:number');
+  const initialLocationKey = useRef(location.key);
 
   const dispatch = useDispatch();
 
@@ -39,7 +49,13 @@ const App = () => {
     dispatch(checkAuth());
   }, [dispatch]);
 
-  const background = (location.state as LocationState | null)?.background;
+  const background =
+    location.key !== initialLocationKey.current
+      ? (location.state as LocationState | null)?.background
+      : undefined;
+  const orderNumber =
+    feedOrderMatch?.params.number ?? profileOrderMatch?.params.number;
+  const orderTitle = orderNumber ? `#${orderNumber}` : '';
 
   const closeModal = (fallbackPath: string) => {
     if (background) {
@@ -54,10 +70,7 @@ const App = () => {
       <Route
         path='/feed/:number'
         element={
-          <Modal
-            title='Информация о заказе'
-            onClose={() => closeModal('/feed')}
-          >
+          <Modal title={orderTitle} onClose={() => closeModal('/feed')}>
             <OrderInfo />
           </Modal>
         }
@@ -77,7 +90,7 @@ const App = () => {
         element={
           <ProtectedRoute>
             <Modal
-              title='Информация о заказе'
+              title={orderTitle}
               onClose={() => closeModal('/profile/orders')}
             >
               <OrderInfo />
@@ -150,7 +163,58 @@ const App = () => {
           }
         />
 
-        {!background && modalRoutes}
+        <Route
+          path='/feed/:number'
+          element={
+            <main className={styles.detailPageWrap}>
+              <h1
+                className={clsx(
+                  styles.detailHeader,
+                  'text text_type_digits-default'
+                )}
+              >
+                {orderTitle}
+              </h1>
+              <OrderInfo />
+            </main>
+          }
+        />
+
+        <Route
+          path='/ingredients/:id'
+          element={
+            <main className={styles.detailPageWrap}>
+              <h1
+                className={clsx(
+                  styles.detailHeader,
+                  'text text_type_main-large'
+                )}
+              >
+                Детали ингредиента
+              </h1>
+              <IngredientDetails />
+            </main>
+          }
+        />
+
+        <Route
+          path='/profile/orders/:number'
+          element={
+            <ProtectedRoute>
+              <main className={styles.detailPageWrap}>
+                <h1
+                  className={clsx(
+                    styles.detailHeader,
+                    'text text_type_digits-default'
+                  )}
+                >
+                  {orderTitle}
+                </h1>
+                <OrderInfo />
+              </main>
+            </ProtectedRoute>
+          }
+        />
 
         <Route path='*' element={<NotFound404 />} />
       </Routes>
