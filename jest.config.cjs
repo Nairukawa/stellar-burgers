@@ -1,4 +1,9 @@
 module.exports = {
+    roots: ['<rootDir>/src'],
+  collectCoverageFrom: [
+    'src/services/slices/ingredients-slice.ts',
+    'src/services/slices/constructor-slice.ts'
+  ],
   testEnvironment: 'jsdom',
   testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts?(x)'],
   clearMocks: true,

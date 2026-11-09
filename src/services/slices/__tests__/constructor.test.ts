@@ -5,7 +5,7 @@ import constructorReducer, {
   removeIngredient
 } from '../constructor-slice';
 import { submitOrder } from '../order-submission-slice';
-import { loginUser, logoutUser } from '../auth-slice';
+import { loginUser, logoutUser, registerUser } from '../auth-slice';
 import {
   selectConstructorCounters,
   selectConstructorPrice
@@ -255,5 +255,79 @@ describe('burger constructor', () => {
       logoutUser.fulfilled(undefined, 'logout-request', undefined)
     );
     expect(state).toEqual({ bun: null, ingredients: [], requestId: null });
+  });
+  it('возвращает начальное состояние для неизвестного действия', () => {
+    expect(constructorReducer(undefined, { type: 'UNKNOWN' })).toEqual({
+      bun: null,
+      ingredients: [],
+      requestId: null
+    });
+  });
+
+  it('сохраняет бургер при неизвестном действии', () => {
+    const state = constructorReducer(
+      undefined,
+      addIngredient(ingredient('filling'))
+    );
+
+    expect(constructorReducer(state, { type: 'UNKNOWN' })).toBe(state);
+  });
+
+  it('очищает конструктор, когда запрос не выполняется', () => {
+    let state = constructorReducer(
+      undefined,
+      addIngredient(ingredient('bun', 'bun'))
+    );
+
+    state = constructorReducer(state, addIngredient(ingredient('filling')));
+
+    expect(constructorReducer(state, clearConstructor())).toEqual({
+      bun: null,
+      ingredients: [],
+      requestId: null
+    });
+  });
+
+  it('сохраняет номер запроса при начале оформления заказа', () => {
+    let state = constructorReducer(
+      undefined,
+      addIngredient(ingredient('bun', 'bun'))
+    );
+
+    state = constructorReducer(state, addIngredient(ingredient('filling')));
+
+    expect(
+      constructorReducer(state, submitOrder.pending('request-1', undefined))
+    ).toEqual({
+      ...state,
+      requestId: 'request-1'
+    });
+  });
+
+  it('сохраняет бургер и сбрасывает номер запроса при регистрации', () => {
+    let state = constructorReducer(
+      undefined,
+      addIngredient(ingredient('bun', 'bun'))
+    );
+
+    state = constructorReducer(state, addIngredient(ingredient('filling')));
+
+    const original = state;
+
+    state = constructorReducer(
+      state,
+      submitOrder.pending('old-request', undefined)
+    );
+
+    expect(
+      constructorReducer(
+        state,
+        registerUser.pending('register-request', {
+          name: 'Test user',
+          email: 'test@example.com',
+          password: 'test-password'
+        })
+      )
+    ).toEqual(original);
   });
 });
