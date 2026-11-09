@@ -5,7 +5,7 @@ import constructorReducer, {
   removeIngredient
 } from '../constructor-slice';
 import { submitOrder } from '../order-submission-slice';
-import { loginUser, logoutUser } from '../auth-slice';
+import { loginUser, logoutUser, registerUser } from '../auth-slice';
 import {
   selectConstructorCounters,
   selectConstructorPrice
@@ -40,6 +40,15 @@ const ingredient = (
   image_large: 'test-image-large',
   image_mobile: 'test-image-mobile'
 });
+
+const buildBurger = () => {
+  const state = constructorReducer(
+    undefined,
+    addIngredient(ingredient('bun', 'bun'))
+  );
+
+  return constructorReducer(state, addIngredient(ingredient('filling')));
+};
 
 const order: TOrder = {
   _id: 'order-1',
@@ -255,5 +264,64 @@ describe('burger constructor', () => {
       logoutUser.fulfilled(undefined, 'logout-request', undefined)
     );
     expect(state).toEqual({ bun: null, ingredients: [], requestId: null });
+  });
+
+  it('returns the initial state for an unknown action', () => {
+    expect(constructorReducer(undefined, { type: 'UNKNOWN' })).toEqual({
+      bun: null,
+      ingredients: [],
+      requestId: null
+    });
+  });
+
+  it('preserves the burger for an unknown action', () => {
+    const state = constructorReducer(
+      undefined,
+      addIngredient(ingredient('filling'))
+    );
+
+    expect(constructorReducer(state, { type: 'UNKNOWN' })).toBe(state);
+  });
+
+  it('clears the constructor when no request is in progress', () => {
+    const state = buildBurger();
+
+    expect(constructorReducer(state, clearConstructor())).toEqual({
+      bun: null,
+      ingredients: [],
+      requestId: null
+    });
+  });
+
+  it('stores the request ID when order submission starts', () => {
+    const state = buildBurger();
+
+    expect(
+      constructorReducer(state, submitOrder.pending('request-1', undefined))
+    ).toEqual({
+      ...state,
+      requestId: 'request-1'
+    });
+  });
+
+  it('preserves the burger and clears the request ID when registration starts', () => {
+    let state = buildBurger();
+    const original = state;
+
+    state = constructorReducer(
+      state,
+      submitOrder.pending('old-request', undefined)
+    );
+
+    expect(
+      constructorReducer(
+        state,
+        registerUser.pending('register-request', {
+          name: 'Test user',
+          email: 'test@example.com',
+          password: 'test-password'
+        })
+      )
+    ).toEqual(original);
   });
 });
