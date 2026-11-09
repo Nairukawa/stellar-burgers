@@ -1,5 +1,5 @@
 module.exports = {
-    roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src'],
   collectCoverageFrom: [
     'src/services/slices/ingredients-slice.ts',
     'src/services/slices/constructor-slice.ts'

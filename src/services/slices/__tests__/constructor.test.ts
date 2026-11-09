@@ -41,6 +41,15 @@ const ingredient = (
   image_mobile: 'test-image-mobile'
 });
 
+const buildBurger = () => {
+  const state = constructorReducer(
+    undefined,
+    addIngredient(ingredient('bun', 'bun'))
+  );
+
+  return constructorReducer(state, addIngredient(ingredient('filling')));
+};
+
 const order: TOrder = {
   _id: 'order-1',
   number: 101,
@@ -256,7 +265,8 @@ describe('burger constructor', () => {
     );
     expect(state).toEqual({ bun: null, ingredients: [], requestId: null });
   });
-  it('возвращает начальное состояние для неизвестного действия', () => {
+
+  it('returns the initial state for an unknown action', () => {
     expect(constructorReducer(undefined, { type: 'UNKNOWN' })).toEqual({
       bun: null,
       ingredients: [],
@@ -264,7 +274,7 @@ describe('burger constructor', () => {
     });
   });
 
-  it('сохраняет бургер при неизвестном действии', () => {
+  it('preserves the burger for an unknown action', () => {
     const state = constructorReducer(
       undefined,
       addIngredient(ingredient('filling'))
@@ -273,13 +283,8 @@ describe('burger constructor', () => {
     expect(constructorReducer(state, { type: 'UNKNOWN' })).toBe(state);
   });
 
-  it('очищает конструктор, когда запрос не выполняется', () => {
-    let state = constructorReducer(
-      undefined,
-      addIngredient(ingredient('bun', 'bun'))
-    );
-
-    state = constructorReducer(state, addIngredient(ingredient('filling')));
+  it('clears the constructor when no request is in progress', () => {
+    const state = buildBurger();
 
     expect(constructorReducer(state, clearConstructor())).toEqual({
       bun: null,
@@ -288,13 +293,8 @@ describe('burger constructor', () => {
     });
   });
 
-  it('сохраняет номер запроса при начале оформления заказа', () => {
-    let state = constructorReducer(
-      undefined,
-      addIngredient(ingredient('bun', 'bun'))
-    );
-
-    state = constructorReducer(state, addIngredient(ingredient('filling')));
+  it('stores the request ID when order submission starts', () => {
+    const state = buildBurger();
 
     expect(
       constructorReducer(state, submitOrder.pending('request-1', undefined))
@@ -304,14 +304,8 @@ describe('burger constructor', () => {
     });
   });
 
-  it('сохраняет бургер и сбрасывает номер запроса при регистрации', () => {
-    let state = constructorReducer(
-      undefined,
-      addIngredient(ingredient('bun', 'bun'))
-    );
-
-    state = constructorReducer(state, addIngredient(ingredient('filling')));
-
+  it('preserves the burger and clears the request ID when registration starts', () => {
+    let state = buildBurger();
     const original = state;
 
     state = constructorReducer(
