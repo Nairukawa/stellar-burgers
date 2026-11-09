@@ -1,51 +1,91 @@
+import { ChangeEvent, FC, SyntheticEvent, useEffect, useState } from 'react';
 import { ProfileUI } from '@ui-pages';
-import { FC, SyntheticEvent, useEffect, useState } from 'react';
+import { Preloader } from '@ui';
+import type { TRegisterData } from '@api';
+
+import { useDispatch, useSelector } from '../../services/store';
+import { selectAuth } from '../../services/selectors/auth-selectors';
+import { clearAuthError, updateUser } from '../../services/slices/auth-slice';
 
 export const Profile: FC = () => {
-  /** TODO: взять переменную из стора */
-  const user = {
-    name: '',
-    email: ''
-  };
+  const dispatch = useDispatch();
+  const { user, isLoading, error } = useSelector(selectAuth);
+
+  const name = user?.name ?? '';
+  const email = user?.email ?? '';
 
   const [formValue, setFormValue] = useState({
-    name: user.name,
-    email: user.email,
+    name,
+    email,
     password: ''
   });
 
   useEffect(() => {
-    setFormValue((prevState) => ({
-      ...prevState,
-      name: user?.name || '',
-      email: user?.email || ''
-    }));
-  }, [user]);
+    dispatch(clearAuthError());
+  }, [dispatch]);
 
-  const isFormChanged =
-    formValue.name !== user?.name ||
-    formValue.email !== user?.email ||
-    !!formValue.password;
-
-  const handleSubmit = (e: SyntheticEvent) => {
-    e.preventDefault();
-  };
-
-  const handleCancel = (e: SyntheticEvent) => {
-    e.preventDefault();
+  useEffect(() => {
     setFormValue({
-      name: user.name,
-      email: user.email,
+      name,
+      email,
       password: ''
     });
+  }, [name, email]);
+
+  const isFormChanged =
+    formValue.name !== name ||
+    formValue.email !== email ||
+    formValue.password !== '';
+
+  const handleSubmit = async (event: SyntheticEvent) => {
+    event.preventDefault();
+
+    if (!user || isLoading || !isFormChanged) return;
+
+    const data: Partial<TRegisterData> = {
+      name: formValue.name,
+      email: formValue.email
+    };
+
+    if (formValue.password) {
+      data.password = formValue.password;
+    }
+
+    const result = await dispatch(updateUser(data));
+
+    if (updateUser.fulfilled.match(result)) {
+      setFormValue({
+        name: result.payload.name,
+        email: result.payload.email,
+        password: ''
+      });
+    }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormValue((prevState) => ({
-      ...prevState,
-      [e.target.name]: e.target.value
+  const handleCancel = (event: SyntheticEvent) => {
+    event.preventDefault();
+
+    setFormValue({
+      name,
+      email,
+      password: ''
+    });
+
+    dispatch(clearAuthError());
+  };
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { name: fieldName, value } = event.target;
+
+    setFormValue((previous) => ({
+      ...previous,
+      [fieldName]: value
     }));
   };
+
+  if (isLoading) {
+    return <Preloader />;
+  }
 
   return (
     <ProfileUI
@@ -54,8 +94,7 @@ export const Profile: FC = () => {
       handleCancel={handleCancel}
       handleSubmit={handleSubmit}
       handleInputChange={handleInputChange}
+      updateUserError={error || undefined}
     />
   );
-
-  return null;
 };
